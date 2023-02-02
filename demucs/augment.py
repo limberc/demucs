@@ -7,6 +7,7 @@
 """
 
 import random
+
 import torch as th
 from torch import nn
 
@@ -15,6 +16,7 @@ class Shift(nn.Module):
     """
     Randomly shift audio in time by up to `shift` samples.
     """
+
     def __init__(self, shift=8192, same=False):
         super().__init__()
         self.shift = shift
@@ -39,6 +41,7 @@ class FlipChannels(nn.Module):
     """
     Flip left-right channels.
     """
+
     def forward(self, wav):
         batch, sources, channels, time = wav.size()
         if self.training and wav.size(2) == 2:
@@ -53,6 +56,7 @@ class FlipSign(nn.Module):
     """
     Random sign flip.
     """
+
     def forward(self, wav):
         batch, sources, channels, time = wav.size()
         if self.training:
@@ -65,6 +69,7 @@ class Remix(nn.Module):
     """
     Shuffle sources to make new mixes.
     """
+
     def __init__(self, proba=1, group_size=4):
         """
         Shuffle sources within one batch.
@@ -105,6 +110,7 @@ class Scale(nn.Module):
     def forward(self, wav):
         batch, streams, channels, time = wav.size()
         device = wav.device
+
         if self.training and random.random() < self.proba:
             scales = th.empty(batch, streams, 1, 1, device=device).uniform_(self.min, self.max)
             wav *= scales

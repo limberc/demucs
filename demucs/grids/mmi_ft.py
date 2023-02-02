@@ -4,9 +4,10 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
-from ._explorers import MyExplorer
 from dora import Launcher
+
 from demucs import train
+from ._explorers import MyExplorer
 
 
 def get_sub(launcher, sig):

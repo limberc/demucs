@@ -8,19 +8,18 @@
 
 import logging
 import os
-from pathlib import Path
 import sys
+from pathlib import Path
 
-from dora import hydra_main
 import hydra
+import torch
+from dora import hydra_main
 from hydra.core.global_hydra import GlobalHydra
 from omegaconf import OmegaConf
-import torch
 from torch import nn
 from torch.utils.data import ConcatDataset
 
 from . import distrib
-from .wav import get_wav_datasets, get_musdb_wav_datasets
 from .demucs import Demucs
 from .hdemucs import HDemucs
 from .htdemucs import HTDemucs
@@ -28,6 +27,7 @@ from .repitch import RepitchedWrapper
 from .solver import Solver
 from .states import capture_init
 from .utils import random_subset
+from .wav import get_musdb_wav_datasets, get_wav_datasets
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ class TorchHDemucsWrapper(nn.Module):
     See https://pytorch.org/audio/stable/tutorials/hybrid_demucs_tutorial.html"""
 
     @capture_init
-    def __init__(self,  **kwargs):
+    def __init__(self, **kwargs):
         super().__init__()
         try:
             from torchaudio.models import HDemucs as TorchHDemucs
@@ -147,7 +147,7 @@ def get_solver(args, model_only=False):
     model = get_model(args)
     if args.misc.show:
         logger.info(model)
-        mb = sum(p.numel() for p in model.parameters()) * 4 / 2**20
+        mb = sum(p.numel() for p in model.parameters()) * 4 / 2 ** 20
         logger.info('Size: %.1f MB', mb)
         if hasattr(model, 'valid_length'):
             field = model.valid_length(1)
@@ -237,7 +237,6 @@ def main(args):
 
 if '_DORA_TEST_PATH' in os.environ:
     main.dora.dir = Path(os.environ['_DORA_TEST_PATH'])
-
 
 if __name__ == "__main__":
     main()

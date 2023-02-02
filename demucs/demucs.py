@@ -13,16 +13,17 @@ from torch import nn
 from torch.nn import functional as F
 
 from .states import capture_init
-from .utils import center_trim, unfold
 from .transformer import LayerScale
+from .utils import center_trim, unfold
 
 
-class BLSTM(nn.Module):
+class BiLSTM(nn.Module):
     """
     BiLSTM with same hidden units as input dim.
     If `max_steps` is not None, input will be splitting in overlapping
     chunks and the LSTM applied separately on each chunk.
     """
+
     def __init__(self, dim, layers=1, max_steps=None, skip=False):
         super().__init__()
         assert max_steps is None or max_steps % 4 == 0
@@ -71,7 +72,7 @@ def rescale_conv(conv, reference):
     """Rescale initial weight scale. It is unclear why it helps but it certainly does.
     """
     std = conv.weight.std().detach()
-    scale = (std / reference)**0.5
+    scale = (std / reference) ** 0.5
     conv.weight.data /= scale
     if conv.bias is not None:
         conv.bias.data /= scale
@@ -90,6 +91,7 @@ class DConv(nn.Module):
     Also before entering each residual branch, dimension is projected on a smaller subspace,
     e.g. of dim `channels // compress`.
     """
+
     def __init__(self, channels: int, compress: float = 4, depth: int = 2, init: float = 1e-4,
                  norm=True, attn=False, heads=4, ndecay=4, lstm=False, gelu=True,
                  kernel=3, dilate=True):
@@ -144,7 +146,7 @@ class DConv(nn.Module):
             if attn:
                 mods.insert(3, LocalState(hidden, heads=heads, ndecay=ndecay))
             if lstm:
-                mods.insert(3, BLSTM(hidden, layers=2, max_steps=200, skip=True))
+                mods.insert(3, BiLSTM(hidden, layers=2, max_steps=200, skip=True))
             layer = nn.Sequential(*mods)
             self.layers.append(layer)
 
@@ -160,6 +162,7 @@ class LocalState(nn.Module):
 
     Also a failed experiments with trying to provide some frequency based attention.
     """
+
     def __init__(self, channels: int, heads: int = 4, nfreqs: int = 0, ndecay: int = 4):
         super().__init__()
         assert channels % heads == 0, (channels, heads)
@@ -190,7 +193,7 @@ class LocalState(nn.Module):
         keys = self.key(x).view(B, heads, -1, T)
         # t are keys, s are queries
         dots = torch.einsum("bhct,bhcs->bhts", keys, queries)
-        dots /= keys.shape[2]**0.5
+        dots /= keys.shape[2] ** 0.5
         if self.nfreqs:
             periods = torch.arange(1, self.nfreqs + 1, device=x.device, dtype=x.dtype)
             freq_kernel = torch.cos(2 * math.pi * delta / periods.view(-1, 1, 1))
@@ -200,7 +203,7 @@ class LocalState(nn.Module):
             decays = torch.arange(1, self.ndecay + 1, device=x.device, dtype=x.dtype)
             decay_q = self.query_decay(x).view(B, heads, -1, T)
             decay_q = torch.sigmoid(decay_q) / 2
-            decay_kernel = - decays.view(-1, 1, 1) * delta.abs() / self.ndecay**0.5
+            decay_kernel = - decays.view(-1, 1, 1) * delta.abs() / self.ndecay ** 0.5
             dots += torch.einsum("fts,bhfs->bhts", decay_kernel, decay_q)
 
         # Kill self reference.
@@ -357,7 +360,7 @@ class Demucs(nn.Module):
                 decode += [DConv(channels, depth=dconv_depth, init=dconv_init,
                                  compress=dconv_comp, attn=attn, lstm=lstm)]
             decode += [nn.ConvTranspose1d(channels, out_channels,
-                       kernel_size, stride, padding=padding)]
+                                          kernel_size, stride, padding=padding)]
             if index > 0:
                 decode += [norm_fn(out_channels), act2()]
             self.decoder.insert(0, nn.Sequential(*decode))
@@ -366,7 +369,7 @@ class Demucs(nn.Module):
 
         channels = in_channels
         if lstm_layers:
-            self.lstm = BLSTM(channels, lstm_layers)
+            self.lstm = BiLSTM(channels, lstm_layers)
         else:
             self.lstm = None
 

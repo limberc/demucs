@@ -5,23 +5,23 @@
 # LICENSE file in the root directory of this source tree.
 """Loading wav based datasets, including MusdbHQ."""
 
-from collections import OrderedDict
 import hashlib
-import math
 import json
+import math
 import os
+from collections import OrderedDict
 from pathlib import Path
-import tqdm
 
-import musdb
 import julius
+import musdb
 import torch as th
-from torch import distributed
 import torchaudio as ta
+import tqdm
+from torch import distributed
 from torch.nn import functional as F
 
-from .audio import convert_audio_channels
 from . import distrib
+from .audio import convert_audio_channels
 
 MIXTURE = "mixture"
 EXT = ".wav"
@@ -94,11 +94,9 @@ def build_metadata(path, sources, normalize=True, ext=EXT):
 
 
 class Wavset:
-    def __init__(
-            self,
-            root, metadata, sources,
-            segment=None, shift=None, normalize=True,
-            samplerate=44100, channels=2, ext=EXT):
+    def __init__(self, root, metadata, sources,
+                 segment=None, shift=None, normalize=True,
+                 samplerate=44100, channels=2, ext=EXT):
         """
         Waveset (or mp3 set for that matter). Can be used to train
         with arbitrary sources. Each track should be one folder inside of `path`.

@@ -5,20 +5,18 @@
 # LICENSE file in the root directory of this source tree.
 # First author is Simon Rouard.
 
+import math
 import random
 import typing as tp
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
-import math
 from einops import rearrange
 
 
-def create_sin_embedding(
-    length: int, dim: int, shift: int = 0, device="cpu", max_period=10000
-):
+def create_sin_embedding(length: int, dim: int, shift: int = 0, device="cpu", max_period=10000):
     # We aim for TBC format
     assert dim % 2 == 0
     pos = shift + torch.arange(length, device=device).view(-1, 1, 1)
@@ -71,16 +69,16 @@ def create_2d_sin_embedding(d_model, height, width, device="cpu", max_period=100
 
 
 def create_sin_embedding_cape(
-    length: int,
-    dim: int,
-    batch_size: int,
-    mean_normalize: bool,
-    augment: bool,  # True during training
-    max_global_shift: float = 0.0,  # delta max
-    max_local_shift: float = 0.0,  # epsilon max
-    max_scale: float = 1.0,
-    device: str = "cpu",
-    max_period: float = 10000.0,
+        length: int,
+        dim: int,
+        batch_size: int,
+        mean_normalize: bool,
+        augment: bool,  # True during training
+        max_global_shift: float = 0.0,  # delta max
+        max_local_shift: float = 0.0,  # epsilon max
+        max_scale: float = 1.0,
+        device: str = "cpu",
+        max_period: float = 10000.0,
 ):
     # We aim for TBC format
     assert dim % 2 == 0
@@ -120,16 +118,13 @@ def get_causal_mask(length):
     return pos > pos[:, None]
 
 
-def get_elementary_mask(
-    T1,
-    T2,
-    mask_type,
-    sparse_attn_window,
-    global_window,
-    mask_random_seed,
-    sparsity,
-    device,
-):
+def get_elementary_mask(T1, T2,
+                        mask_type,
+                        sparse_attn_window,
+                        global_window,
+                        mask_random_seed,
+                        sparsity,
+                        device):
     """
     When the input of the Decoder has length T1 and the output T2
     The mask matrix has shape (T2, T1)
@@ -143,7 +138,6 @@ def get_elementary_mask(
         mask[:line_window, :] = True
 
     if mask_type == "diag":
-
         mask = torch.zeros(T2, T1, dtype=torch.bool)
         rows = torch.arange(T2)[:, None]
         cols = (
@@ -167,24 +161,21 @@ def get_elementary_mask(
         gene = torch.Generator(device=device)
         gene.manual_seed(mask_random_seed)
         mask = (
-            torch.rand(T1 * T2, generator=gene, device=device).reshape(T2, T1)
-            > sparsity
+                torch.rand(T1 * T2, generator=gene, device=device).reshape(T2, T1)
+                > sparsity
         )
 
     mask = mask.to(device)
     return mask
 
 
-def get_mask(
-    T1,
-    T2,
-    mask_type,
-    sparse_attn_window,
-    global_window,
-    mask_random_seed,
-    sparsity,
-    device,
-):
+def get_mask(T1, T2,
+             mask_type,
+             sparse_attn_window,
+             global_window,
+             mask_random_seed,
+             sparsity,
+             device):
     """
     Return a SparseCSRTensor mask that is a combination of elementary masks
     mask_type can be a combination of multiple masks: for instance "diag_jmask_random"
@@ -213,13 +204,11 @@ def get_mask(
 
 
 class ScaledEmbedding(nn.Module):
-    def __init__(
-        self,
-        num_embeddings: int,
-        embedding_dim: int,
-        scale: float = 1.0,
-        boost: float = 3.0,
-    ):
+    def __init__(self,
+                 num_embeddings: int,
+                 embedding_dim: int,
+                 scale: float = 1.0,
+                 boost: float = 3.0):
         super().__init__()
         self.embedding = nn.Embedding(num_embeddings, embedding_dim)
         self.embedding.weight.data *= scale / boost
@@ -269,30 +258,26 @@ class MyGroupNorm(nn.GroupNorm):
 
 
 class MyTransformerEncoderLayer(nn.TransformerEncoderLayer):
-    def __init__(
-        self,
-        d_model,
-        nhead,
-        dim_feedforward=2048,
-        dropout=0.1,
-        activation=F.relu,
-        group_norm=0,
-        norm_first=False,
-        norm_out=False,
-        layer_norm_eps=1e-5,
-        layer_scale=False,
-        init_values=1e-4,
-        device=None,
-        dtype=None,
-        sparse=False,
-        mask_type="diag",
-        mask_random_seed=42,
-        sparse_attn_window=500,
-        global_window=50,
-        auto_sparsity=False,
-        sparsity=0.95,
-        batch_first=False,
-    ):
+    def __init__(self, d_model, nhead,
+                 dim_feedforward=2048,
+                 dropout=0.1,
+                 activation=F.relu,
+                 group_norm=0,
+                 norm_first=False,
+                 norm_out=False,
+                 layer_norm_eps=1e-5,
+                 layer_scale=False,
+                 init_values=1e-4,
+                 device=None,
+                 dtype=None,
+                 sparse=False,
+                 mask_type="diag",
+                 mask_random_seed=42,
+                 sparse_attn_window=500,
+                 global_window=50,
+                 auto_sparsity=False,
+                 sparsity=0.95,
+                 batch_first=False):
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__(
             d_model=d_model,
@@ -349,8 +334,7 @@ class MyTransformerEncoderLayer(nn.TransformerEncoderLayer):
             src_mask = self.src_mask
             if src_mask.shape[-1] != T:
                 src_mask = get_mask(
-                    T,
-                    T,
+                    T, T,
                     self.mask_type,
                     self.sparse_attn_window,
                     self.global_window,
@@ -378,30 +362,28 @@ class MyTransformerEncoderLayer(nn.TransformerEncoderLayer):
 
 
 class CrossTransformerEncoderLayer(nn.Module):
-    def __init__(
-        self,
-        d_model: int,
-        nhead: int,
-        dim_feedforward: int = 2048,
-        dropout: float = 0.1,
-        activation=F.relu,
-        layer_norm_eps: float = 1e-5,
-        layer_scale: bool = False,
-        init_values: float = 1e-4,
-        norm_first: bool = False,
-        group_norm: bool = False,
-        norm_out: bool = False,
-        sparse=False,
-        mask_type="diag",
-        mask_random_seed=42,
-        sparse_attn_window=500,
-        global_window=50,
-        sparsity=0.95,
-        auto_sparsity=None,
-        device=None,
-        dtype=None,
-        batch_first=False,
-    ):
+    def __init__(self,
+                 d_model: int,
+                 nhead: int,
+                 dim_feedforward: int = 2048,
+                 dropout: float = 0.1,
+                 activation=F.relu,
+                 layer_norm_eps: float = 1e-5,
+                 layer_scale: bool = False,
+                 init_values: float = 1e-4,
+                 norm_first: bool = False,
+                 group_norm: bool = False,
+                 norm_out: bool = False,
+                 sparse=False,
+                 mask_type="diag",
+                 mask_random_seed=42,
+                 sparse_attn_window=500,
+                 global_window=50,
+                 sparsity=0.95,
+                 auto_sparsity=None,
+                 device=None,
+                 dtype=None,
+                 batch_first=False):
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
 
@@ -524,40 +506,38 @@ class CrossTransformerEncoderLayer(nn.Module):
 
 
 class CrossTransformerEncoder(nn.Module):
-    def __init__(
-        self,
-        dim: int,
-        emb: str = "sin",
-        hidden_scale: float = 4.0,
-        num_heads: int = 8,
-        num_layers: int = 6,
-        cross_first: bool = False,
-        dropout: float = 0.0,
-        max_positions: int = 1000,
-        norm_in: bool = True,
-        norm_in_group: bool = False,
-        group_norm: int = False,
-        norm_first: bool = False,
-        norm_out: bool = False,
-        max_period: float = 10000.0,
-        weight_decay: float = 0.0,
-        lr: tp.Optional[float] = None,
-        layer_scale: bool = False,
-        gelu: bool = True,
-        sin_random_shift: int = 0,
-        weight_pos_embed: float = 1.0,
-        cape_mean_normalize: bool = True,
-        cape_augment: bool = True,
-        cape_glob_loc_scale: list = [5000.0, 1.0, 1.4],
-        sparse_self_attn: bool = False,
-        sparse_cross_attn: bool = False,
-        mask_type: str = "diag",
-        mask_random_seed: int = 42,
-        sparse_attn_window: int = 500,
-        global_window: int = 50,
-        auto_sparsity: bool = False,
-        sparsity: float = 0.95,
-    ):
+    def __init__(self,
+                 dim: int,
+                 emb: str = "sin",
+                 hidden_scale: float = 4.0,
+                 num_heads: int = 8,
+                 num_layers: int = 6,
+                 cross_first: bool = False,
+                 dropout: float = 0.0,
+                 max_positions: int = 1000,
+                 norm_in: bool = True,
+                 norm_in_group: bool = False,
+                 group_norm: int = False,
+                 norm_first: bool = False,
+                 norm_out: bool = False,
+                 max_period: float = 10000.0,
+                 weight_decay: float = 0.0,
+                 lr: tp.Optional[float] = None,
+                 layer_scale: bool = False,
+                 gelu: bool = True,
+                 sin_random_shift: int = 0,
+                 weight_pos_embed: float = 1.0,
+                 cape_mean_normalize: bool = True,
+                 cape_augment: bool = True,
+                 cape_glob_loc_scale: list = [5000.0, 1.0, 1.4],
+                 sparse_self_attn: bool = False,
+                 sparse_cross_attn: bool = False,
+                 mask_type: str = "diag",
+                 mask_random_seed: int = 42,
+                 sparse_attn_window: int = 500,
+                 global_window: int = 50,
+                 auto_sparsity: bool = False,
+                 sparsity: float = 0.95):
         super().__init__()
         """
         """
@@ -723,19 +703,17 @@ class CrossTransformerEncoder(nn.Module):
 
 
 class MultiheadAttention(nn.Module):
-    def __init__(
-        self,
-        embed_dim,
-        num_heads,
-        dropout=0.0,
-        bias=True,
-        add_bias_kv=False,
-        add_zero_attn=False,
-        kdim=None,
-        vdim=None,
-        batch_first=False,
-        auto_sparsity=None,
-    ):
+    def __init__(self,
+                 embed_dim,
+                 num_heads,
+                 dropout=0.0,
+                 bias=True,
+                 add_bias_kv=False,
+                 add_zero_attn=False,
+                 kdim=None,
+                 vdim=None,
+                 batch_first=False,
+                 auto_sparsity=None):
         super().__init__()
         assert auto_sparsity is not None, "sanity check"
         self.num_heads = num_heads
@@ -748,16 +726,11 @@ class MultiheadAttention(nn.Module):
         self.batch_first = batch_first
         self.auto_sparsity = auto_sparsity
 
-    def forward(
-        self,
-        query,
-        key,
-        value,
-        key_padding_mask=None,
-        need_weights=True,
-        attn_mask=None,
-        average_attn_weights=True,
-    ):
+    def forward(self, query, key, value,
+                key_padding_mask=None,
+                need_weights=True,
+                attn_mask=None,
+                average_attn_weights=True):
 
         if not self.batch_first:  # N, B, C
             query = query.permute(1, 0, 2)  # B, N_q, C
@@ -766,23 +739,20 @@ class MultiheadAttention(nn.Module):
         B, N_q, C = query.shape
         B, N_k, C = key.shape
 
-        q = (
-            self.q(query)
-            .reshape(B, N_q, self.num_heads, C // self.num_heads)
-            .permute(0, 2, 1, 3)
-        )
+        q = (self.q(query)
+             .reshape(B, N_q, self.num_heads, C // self.num_heads)
+             .permute(0, 2, 1, 3)
+             )
         q = q.flatten(0, 1)
-        k = (
-            self.k(key)
-            .reshape(B, N_k, self.num_heads, C // self.num_heads)
-            .permute(0, 2, 1, 3)
-        )
+        k = (self.k(key)
+             .reshape(B, N_k, self.num_heads, C // self.num_heads)
+             .permute(0, 2, 1, 3)
+             )
         k = k.flatten(0, 1)
-        v = (
-            self.v(value)
-            .reshape(B, N_k, self.num_heads, C // self.num_heads)
-            .permute(0, 2, 1, 3)
-        )
+        v = (self.v(value)
+             .reshape(B, N_k, self.num_heads, C // self.num_heads)
+             .permute(0, 2, 1, 3)
+             )
         v = v.flatten(0, 1)
 
         if self.auto_sparsity:

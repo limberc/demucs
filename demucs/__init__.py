@@ -5,3 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 
 __version__ = "4.0.0"
+
+from .demucs import Demucs
+from .hdemucs import HDemucs
+from .htdemucs import HTDemucs

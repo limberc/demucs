@@ -342,7 +342,7 @@ class Solver(object):
                 loss += args.quant.diffq * ms
 
             losses = {}
-            losses['reco'] = (reco * weights).sum() / weights.sum()
+            losses['reco'] = loss
             losses['ms'] = ms
 
             if not train:

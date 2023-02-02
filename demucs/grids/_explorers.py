@@ -3,8 +3,8 @@
 #
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
-from dora import Explorer
 import treetable as tt
+from dora import Explorer
 
 
 class MyExplorer(Explorer):
@@ -17,7 +17,7 @@ class MyExplorer(Explorer):
             tt.group("train", [
                 tt.leaf("epoch"),
                 tt.leaf("reco", ".3f"),
-             ], align=">"),
+            ], align=">"),
             tt.group("valid", [
                 tt.leaf("penalty", ".1f"),
                 tt.leaf("ms", ".1f"),
@@ -28,11 +28,11 @@ class MyExplorer(Explorer):
                 # tt.leaf("b_nsdr_bass", ".2f"),
                 # tt.leaf("b_nsdr_other", ".2f"),
                 # tt.leaf("b_nsdr_vocals", ".2f"),
-             ], align=">"),
+            ], align=">"),
             tt.group("test", [
                 tt.leaf(name, ".2f")
                 for name in self.test_metrics
-             ], align=">")
+            ], align=">")
         ]
 
     def process_history(self, history):

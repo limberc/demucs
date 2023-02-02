@@ -7,8 +7,8 @@ import json
 import subprocess as sp
 from pathlib import Path
 
-import lameenc
 import julius
+import lameenc
 import numpy as np
 import torch
 import torchaudio as ta
@@ -29,6 +29,7 @@ class AudioFile:
     Allows to read audio from any format supported by ffmpeg, as well as resampling or
     converting to mono on the fly. See :method:`read` for more details.
     """
+
     def __init__(self, path: Path):
         self.path = Path(path)
         self._info = None
@@ -178,7 +179,7 @@ def convert_audio(wav, from_samplerate, to_samplerate, channels):
 def i16_pcm(wav):
     """Convert audio to 16 bits integer PCM format."""
     if wav.dtype.is_floating_point:
-        return (wav.clamp_(-1, 1) * (2**15 - 1)).short()
+        return (wav.clamp_(-1, 1) * (2 ** 15 - 1)).short()
     else:
         return wav
 
@@ -188,7 +189,7 @@ def f32_pcm(wav):
     if wav.dtype.is_floating_point:
         return wav
     else:
-        return wav.float() / (2**15 - 1)
+        return wav.float() / (2 ** 15 - 1)
 
 
 def as_dtype_pcm(wav, dtype):
