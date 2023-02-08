@@ -19,6 +19,7 @@ class RepitchedWrapper:
     """
     Wrap a dataset to apply online change of pitch / tempo.
     """
+
     def __init__(self, dataset, proba=0.2, max_pitch=2, max_tempo=12,
                  tempo_std=5, vocals=[3], same=True):
         self.dataset = dataset

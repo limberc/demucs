@@ -7,18 +7,18 @@
 
 import logging
 
-from dora import get_xp
-from dora.utils import write_and_rename
-from dora.log import LogProgress, bold
 import torch
 import torch.nn.functional as F
+from dora import get_xp
+from dora.log import LogProgress, bold
+from dora.utils import write_and_rename
 
-from . import augment, distrib, states, pretrained
+from . import augment, distrib, pretrained, states
 from .apply import apply_model
 from .ema import ModelEMA
 from .evaluate import evaluate, new_sdr
 from .svd import svd_penalty
-from .utils import pull_metric, EMA
+from .utils import EMA, pull_metric
 
 logger = logging.getLogger(__name__)
 
@@ -328,7 +328,7 @@ class Solver(object):
             elif args.optim.loss == 'mse':
                 loss = F.mse_loss(estimate, sources, reduction='none')
                 loss = loss.mean(dims)
-                reco = loss**0.5
+                reco = loss ** 0.5
                 reco = reco.mean(0)
             else:
                 raise ValueError(f"Invalid loss {self.args.loss}")
@@ -372,7 +372,7 @@ class Solver(object):
                 grads = []
                 for p in self.model.parameters():
                     if p.grad is not None:
-                        grad_norm += p.grad.data.norm()**2
+                        grad_norm += p.grad.data.norm() ** 2
                         grads.append(p.grad.data)
                 losses['grad'] = grad_norm ** 0.5
                 if args.optim.clip_grad:

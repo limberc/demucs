@@ -11,30 +11,29 @@ shift to maximize pitches overlap.
 In order to limit artifacts, only parts that can be mixed with less than 15%
 tempo shift, and 3 semitones of pitch shift are mixed together.
 """
-from collections import namedtuple
-from concurrent.futures import ProcessPoolExecutor
 import hashlib
-from pathlib import Path
+import pickle
 import random
 import shutil
-import tqdm
-import pickle
+from collections import namedtuple
+from concurrent.futures import ProcessPoolExecutor
+from pathlib import Path
 
-from librosa.beat import beat_track
-from librosa.feature import chroma_cqt
 import numpy as np
 import torch
+import tqdm
+from dora.utils import try_load
+from librosa.beat import beat_track
+from librosa.feature import chroma_cqt
 from torch.nn import functional as F
 
-from dora.utils import try_load
 from demucs.audio import save_audio
-from demucs.repitch import repitch
 from demucs.pretrained import SOURCES
-from demucs.wav import build_metadata, Wavset, _get_musdb_valid
+from demucs.repitch import repitch
+from demucs.wav import Wavset, _get_musdb_valid, build_metadata
 
-
-MUSDB_PATH = '/checkpoint/defossez/datasets/musdbhq'
-EXTRA_WAV_PATH = "/checkpoint/defossez/datasets/allstems_44"
+MUSDB_PATH = './data/musdb18hq'
+EXTRA_WAV_PATH = "./data/allstems_44"
 # WARNING: OUTPATH will be completely erased.
 OUTPATH = Path.home() / 'tmp/demucs_mdx/automix_musdb/'
 CACHE = Path.home() / 'tmp/automix_cache'  # cache BPM and pitch information.
@@ -42,7 +41,6 @@ CHANNELS = 2
 SR = 44100
 MAX_PITCH = 3  # maximum allowable pitch shift in semi tones
 MAX_TEMPO = 0.15  # maximum allowable tempo shift
-
 
 Spec = namedtuple("Spec", "tempo onsets kr track index")
 
@@ -125,7 +123,7 @@ def align_stems(stems):
     limit = 5
     std = 2
     x = torch.arange(-limit, limit + 1, 1).float()
-    gauss = torch.exp(-x**2 / (2 * std**2))
+    gauss = torch.exp(-x ** 2 / (2 * std ** 2))
 
     grids = []
     for wav, onsets in stems:
@@ -180,7 +178,7 @@ def find_candidate(spec_ref, catalog, pitch_match=True):
 
     for spec in candidates:
         ok = False
-        for scale in [1/4, 1/2, 1, 2, 4]:
+        for scale in [1 / 4, 1 / 2, 1, 2, 4]:
             tempo = spec.tempo * scale
             delta_tempo = spec_ref.tempo / tempo - 1
             if abs(delta_tempo) < MAX_TEMPO:

@@ -66,7 +66,7 @@ class ScaledEmbedding(nn.Module):
         return out
 
 
-class HEncLayer(nn.Module):
+class HEncoderLayer(nn.Module):
     def __init__(self, chin, chout, kernel_size=8, stride=4, norm_groups=1, empty=False,
                  freq=True, dconv=True, norm=True, context=0, dconv_kw={}, pad=True,
                  rewrite=True):
@@ -169,13 +169,13 @@ class MultiWrap(nn.Module):
     def __init__(self, layer, split_ratios):
         """
         Args:
-            layer: module to clone, must be either HEncLayer or HDecLayer.
+            layer: module to clone, must be either HEncoderLayer or HDecLayer.
             split_ratios: list of float indicating which ratio to keep for each band.
         """
         super().__init__()
         self.split_ratios = split_ratios
         self.layers = nn.ModuleList()
-        self.conv = isinstance(layer, HEncLayer)
+        self.conv = isinstance(layer, HEncoderLayer)
         assert not layer.norm
         assert layer.freq
         assert layer.pad
@@ -258,7 +258,7 @@ class HDecLayer(nn.Module):
                  freq=True, dconv=True, norm=True, context=1, dconv_kw={}, pad=True,
                  context_freq=True, rewrite=True):
         """
-        Same as HEncLayer but for decoder. See `HEncLayer` for documentation.
+        Same as HEncoderLayer but for decoder. See `HEncoderLayer` for documentation.
         """
         super().__init__()
         norm_fn = lambda d: nn.Identity()  # noqa
@@ -542,11 +542,11 @@ class HDemucs(nn.Module):
                 chout_z = max(chout, chout_z)
                 chout = chout_z
 
-            enc = HEncLayer(chin_z, chout_z,
-                            dconv=dconv_mode & 1, context=context_enc, **kw)
+            enc = HEncoderLayer(chin_z, chout_z,
+                                dconv=dconv_mode & 1, context=context_enc, **kw)
             if hybrid and freq:
-                tenc = HEncLayer(chin, chout, dconv=dconv_mode & 1, context=context_enc,
-                                 empty=last_freq, **kwt)
+                tenc = HEncoderLayer(chin, chout, dconv=dconv_mode & 1, context=context_enc,
+                                     empty=last_freq, **kwt)
                 self.tencoder.append(tenc)
 
             if multi:

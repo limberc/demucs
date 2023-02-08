@@ -1,9 +1,8 @@
+import hydra
 import torch
 import torch.nn as nn
-from dora import get_xp, hydra_main
 from hydra.utils import to_absolute_path
 from pytorch_lightning import LightningDataModule, LightningModule, Trainer
-from pytorch_lightning.loggers import WandbLogger
 from torch.utils.data import DataLoader
 
 import demucs.augment as augment
@@ -43,7 +42,7 @@ class GetLoss(nn.Module):
         if self.quantizer is not None:
             ms = self.quantizer.model_size()
         if self.diffq:
-            loss += args.diffq * ms
+            loss += self.diffq * ms
         return {
             'loss': loss,
             'reco': loss,
@@ -63,25 +62,15 @@ def get_augument(args):
     return torch.nn.Sequential(*augments)
 
 
-@hydra_main(config_path="../conf", config_name="config")
-def wrap_hydra_args(args):
-    global __file__
-    __file__ = to_absolute_path(__file__)
-    for attr in ["musdb", "wav", "metadata"]:
-        val = getattr(args.dset, attr)
-        if val is not None:
-            setattr(args.dset, attr, to_absolute_path(val))
-    return args
-
-
 class DemucsDataModule(LightningDataModule):
     def __init__(self, args):
         super().__init__()
+        self.args = args
         self.batch_size = args.batch_size
         self.num_worker = args.misc.num_workers
 
-    def setup(self, stage: str) -> None:
-        self.train_set, self.val_set = get_datasets(args)
+    def setup(self) -> None:
+        self.train_set, self.val_set = get_datasets(self.args)
 
     def train_dataloader(self):
         return DataLoader(self.train_set, self.batch_size, shuffle=True, num_workers=self.num_worker)
@@ -108,10 +97,6 @@ class DemucsModule(LightningModule):
                 for decay in decays:
                     self.emas[kind].append(ModelEMA(self.model, decay, device=device))
         self.augument = get_augument(args)
-        xp = get_xp()
-        self.folder = xp.folder
-        self.link = xp.link
-        self.history = self.link.history
         self.split = args.test.split
         self.quantizer = states.get_quantizer(self.model, args.quant, self.optimizer)
         self.loss = GetLoss(args.optim.loss, args.weights, self.quantizer, args.quant.diffq)
@@ -164,16 +149,26 @@ class DemucsModule(LightningModule):
         return self.validation_step(batch, batch_idx)
 
 
-if __name__ == '__main__':
-    args = wrap_hydra_args()
-    logger = WandbLogger('baseline', project="SourceSep")
+@hydra.main(config_path="./conf", config_name="config.yaml")
+def main(args):
+    global __file__
+    __file__ = to_absolute_path(__file__)
+    for attr in ["musdb", "wav", "metadata"]:
+        val = getattr(args.dset, attr)
+        if val is not None:
+            setattr(args.dset, attr, to_absolute_path(val))
+    args = hydra.utils.instantiate(args)
+    # logger = WandbLogger('baseline', project="SourceSep")
     dm = DemucsDataModule(args)
     dm.setup()
     model = DemucsModule(args)
     trainer = Trainer(
-        logger,
         devices=-1,
         max_epochs=args.epochs,
-        precision=16
+        precision=16,
     )
-    trainer.fit(model, dm.train_dataloader(), dm.val_dataloader())
+    trainer.fit()
+
+
+if __name__ == '__main__':
+    main()

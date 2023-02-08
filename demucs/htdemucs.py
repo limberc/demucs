@@ -8,20 +8,19 @@
 This code contains the spectrogram and Hybrid version of Demucs.
 """
 import math
+from fractions import Fraction
 
-from openunmix.filtering import wiener
 import torch
+from einops import rearrange
+from openunmix.filtering import wiener
 from torch import nn
 from torch.nn import functional as F
-from fractions import Fraction
-from einops import rearrange
-
-from .transformer import CrossTransformerEncoder
 
 from .demucs import rescale_module
+from .hdemucs import HDecLayer, HEncoderLayer, MultiWrap, ScaledEmbedding, pad1d
+from .spec import ispectro, spectro
 from .states import capture_init
-from .spec import spectro, ispectro
-from .hdemucs import pad1d, ScaledEmbedding, HEncLayer, MultiWrap, HDecLayer
+from .transformer import CrossTransformerEncoder
 
 
 class HTDemucs(nn.Module):
@@ -53,84 +52,82 @@ class HTDemucs(nn.Module):
     """
 
     @capture_init
-    def __init__(
-        self,
-        sources,
-        # Channels
-        audio_channels=2,
-        channels=48,
-        channels_time=None,
-        growth=2,
-        # STFT
-        nfft=4096,
-        wiener_iters=0,
-        end_iters=0,
-        wiener_residual=False,
-        cac=True,
-        # Main structure
-        depth=4,
-        rewrite=True,
-        # Frequency branch
-        multi_freqs=None,
-        multi_freqs_depth=3,
-        freq_emb=0.2,
-        emb_scale=10,
-        emb_smooth=True,
-        # Convolutions
-        kernel_size=8,
-        time_stride=2,
-        stride=4,
-        context=1,
-        context_enc=0,
-        # Normalization
-        norm_starts=4,
-        norm_groups=4,
-        # DConv residual branch
-        dconv_mode=1,
-        dconv_depth=2,
-        dconv_comp=8,
-        dconv_init=1e-3,
-        # Before the Transformer
-        bottom_channels=0,
-        # Transformer
-        t_layers=5,
-        t_emb="sin",
-        t_hidden_scale=4.0,
-        t_heads=8,
-        t_dropout=0.0,
-        t_max_positions=10000,
-        t_norm_in=True,
-        t_norm_in_group=False,
-        t_group_norm=False,
-        t_norm_first=True,
-        t_norm_out=True,
-        t_max_period=10000.0,
-        t_weight_decay=0.0,
-        t_lr=None,
-        t_layer_scale=True,
-        t_gelu=True,
-        t_weight_pos_embed=1.0,
-        t_sin_random_shift=0,
-        t_cape_mean_normalize=True,
-        t_cape_augment=True,
-        t_cape_glob_loc_scale=[5000.0, 1.0, 1.4],
-        t_sparse_self_attn=False,
-        t_sparse_cross_attn=False,
-        t_mask_type="diag",
-        t_mask_random_seed=42,
-        t_sparse_attn_window=500,
-        t_global_window=100,
-        t_sparsity=0.95,
-        t_auto_sparsity=False,
-        # ------ Particuliar parameters
-        t_cross_first=False,
-        # Weight init
-        rescale=0.1,
-        # Metadata
-        samplerate=44100,
-        segment=10,
-        use_train_segment=True,
-    ):
+    def __init__(self,
+                 sources,
+                 # Channels
+                 audio_channels=2,
+                 channels=48,
+                 channels_time=None,
+                 growth=2,
+                 # STFT
+                 nfft=4096,
+                 wiener_iters=0,
+                 end_iters=0,
+                 wiener_residual=False,
+                 cac=True,
+                 # Main structure
+                 depth=4,
+                 rewrite=True,
+                 # Frequency branch
+                 multi_freqs=None,
+                 multi_freqs_depth=3,
+                 freq_emb=0.2,
+                 emb_scale=10,
+                 emb_smooth=True,
+                 # Convolutions
+                 kernel_size=8,
+                 time_stride=2,
+                 stride=4,
+                 context=1,
+                 context_enc=0,
+                 # Normalization
+                 norm_starts=4,
+                 norm_groups=4,
+                 # DConv residual branch
+                 dconv_mode=1,
+                 dconv_depth=2,
+                 dconv_comp=8,
+                 dconv_init=1e-3,
+                 # Before the Transformer
+                 bottom_channels=0,
+                 # Transformer
+                 t_layers=5,
+                 t_emb="sin",
+                 t_hidden_scale=4.0,
+                 t_heads=8,
+                 t_dropout=0.0,
+                 t_max_positions=10000,
+                 t_norm_in=True,
+                 t_norm_in_group=False,
+                 t_group_norm=False,
+                 t_norm_first=True,
+                 t_norm_out=True,
+                 t_max_period=10000.0,
+                 t_weight_decay=0.0,
+                 t_lr=None,
+                 t_layer_scale=True,
+                 t_gelu=True,
+                 t_weight_pos_embed=1.0,
+                 t_sin_random_shift=0,
+                 t_cape_mean_normalize=True,
+                 t_cape_augment=True,
+                 t_cape_glob_loc_scale=[5000.0, 1.0, 1.4],
+                 t_sparse_self_attn=False,
+                 t_sparse_cross_attn=False,
+                 t_mask_type="diag",
+                 t_mask_random_seed=42,
+                 t_sparse_attn_window=500,
+                 t_global_window=100,
+                 t_sparsity=0.95,
+                 t_auto_sparsity=False,
+                 # ------ Particuliar parameters
+                 t_cross_first=False,
+                 # Weight init
+                 rescale=0.1,
+                 # Metadata
+                 samplerate=44100,
+                 segment=10,
+                 use_train_segment=True):
         """
         Args:
             sources (list[str]): list of source names.
@@ -302,13 +299,12 @@ class HTDemucs(nn.Module):
                 chout_z = max(chout, chout_z)
                 chout = chout_z
 
-            enc = HEncLayer(
+            enc = HEncoderLayer(
                 chin_z, chout_z, dconv=dconv_mode & 1, context=context_enc, **kw
             )
             if freq:
-                tenc = HEncLayer(
-                    chin,
-                    chout,
+                tenc = HEncoderLayer(
+                    chin, chout,
                     dconv=dconv_mode & 1,
                     context=context_enc,
                     empty=last_freq,
@@ -325,8 +321,7 @@ class HTDemucs(nn.Module):
                 if self.cac:
                     chin_z *= 2
             dec = HDecLayer(
-                chout_z,
-                chin_z,
+                chout_z, chin_z,
                 dconv=dconv_mode & 2,
                 last=index == 0,
                 context=context,
@@ -336,8 +331,7 @@ class HTDemucs(nn.Module):
                 dec = MultiWrap(dec, multi_freqs)
             if freq:
                 tdec = HDecLayer(
-                    chout,
-                    chin,
+                    chout, chin,
                     dconv=dconv_mode & 2,
                     empty=last_freq,
                     last=index == 0,
@@ -440,7 +434,7 @@ class HTDemucs(nn.Module):
         return z
 
     def _ispec(self, z, length=None, scale=0):
-        hl = self.hop_length // (4**scale)
+        hl = self.hop_length // (4 ** scale)
         z = F.pad(z, (0, 0, 0, 1))
         z = F.pad(z, (2, 2))
         pad = hl // 2 * 3
@@ -520,8 +514,8 @@ class HTDemucs(nn.Module):
         training_length = int(self.segment * self.samplerate)
         if training_length < length:
             raise ValueError(
-                    f"Given length {length} is longer than "
-                    f"training length {training_length}")
+                f"Given length {length} is longer than "
+                f"training length {training_length}")
         return training_length
 
     def forward(self, mix):

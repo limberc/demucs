@@ -8,16 +8,15 @@ A repo can either be the main remote repository stored in AWS, or a local reposi
 with your own models.
 """
 
+import typing as tp
 from hashlib import sha256
 from pathlib import Path
-import typing as tp
 
 import torch
 import yaml
 
 from .apply import BagOfModels, Model
 from .states import load_model
-
 
 AnyModel = tp.Union[Model, BagOfModels]
 
@@ -30,7 +29,7 @@ def check_checksum(path: Path, checksum: str):
     sha = sha256()
     with open(path, 'rb') as file:
         while True:
-            buf = file.read(2**20)
+            buf = file.read(2 ** 20)
             if not buf:
                 break
             sha.update(buf)
@@ -43,6 +42,7 @@ def check_checksum(path: Path, checksum: str):
 class ModelOnlyRepo:
     """Base class for all model only repos.
     """
+
     def has_model(self, sig: str) -> bool:
         raise NotImplementedError()
 
@@ -105,6 +105,7 @@ class BagOnlyRepo:
     """Handles only YAML files containing bag of models, leaving the actual
     model loading to some Repo.
     """
+
     def __init__(self, root: Path, model_repo: ModelOnlyRepo):
         self.root = root
         self.model_repo = model_repo

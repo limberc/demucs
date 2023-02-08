@@ -5,17 +5,17 @@
 # LICENSE file in the root directory of this source tree.
 
 import argparse
+import subprocess
 import sys
 from pathlib import Path
-import subprocess
 
-from dora.log import fatal
 import torch as th
 import torchaudio as ta
+from dora.log import fatal
 
-from .apply import apply_model, BagOfModels
+from .apply import BagOfModels, apply_model
 from .audio import AudioFile, convert_audio, save_audio
-from .pretrained import get_model_from_args, add_model_flags, ModelLoadingError
+from .pretrained import ModelLoadingError, add_model_flags, get_model_from_args
 
 
 def load_track(track, audio_channels, samplerate):
@@ -60,14 +60,14 @@ def main():
                         type=Path,
                         default=Path("separated"),
                         help="Folder where to put extracted tracks. A subfolder "
-                        "with the model name will be created.")
+                             "with the model name will be created.")
     parser.add_argument("--filename",
                         default="{track}/{stem}.{ext}",
                         help="Set the name of output file. \n"
-                        'Use "{track}", "{trackext}", "{stem}", "{ext}" to use '
-                        "variables of track name without extension, track extension, "
-                        "stem name and default output file extension. \n"
-                        'Default is "{track}/{stem}.{ext}".')
+                             'Use "{track}", "{trackext}", "{stem}", "{ext}" to use '
+                             "variables of track name without extension, track extension, "
+                             "stem name and default output file extension. \n"
+                             'Default is "{track}/{stem}.{ext}".')
     parser.add_argument("-d",
                         "--device",
                         default="cuda" if th.cuda.is_available() else "cpu",
@@ -76,8 +76,8 @@ def main():
                         default=1,
                         type=int,
                         help="Number of random shifts for equivariant stabilization."
-                        "Increase separation time but improves quality for Demucs. 10 was used "
-                        "in the original paper.")
+                             "Increase separation time but improves quality for Demucs. 10 was used "
+                             "in the original paper.")
     parser.add_argument("--overlap",
                         default=0.25,
                         type=float,
@@ -88,10 +88,10 @@ def main():
                              dest="split",
                              default=True,
                              help="Doesn't split audio in chunks. "
-                             "This can use large amounts of memory.")
+                                  "This can use large amounts of memory.")
     split_group.add_argument("--segment", type=int,
                              help="Set split size of each chunk. "
-                             "This can help save memory of graphic card. ")
+                                  "This can help save memory of graphic card. ")
     parser.add_argument("--two-stems",
                         dest="stem", metavar="STEM",
                         help="Only separate audio into {STEM} and no_{STEM}. ")
@@ -196,7 +196,7 @@ def main():
                 other_stem += i
             stem = out / args.filename.format(track=track.name.rsplit(".", 1)[0],
                                               trackext=track.name.rsplit(".", 1)[-1],
-                                              stem="no_"+args.stem, ext=ext)
+                                              stem="no_" + args.stem, ext=ext)
             stem.parent.mkdir(parents=True, exist_ok=True)
             save_audio(other_stem, str(stem), **kwargs)
 

@@ -8,7 +8,7 @@ defaults:
 
 dummy:
 dset:
-  musdb: /checkpoint/defossez/datasets/musdbhq
+  musdb: ./data/musdbhq
   musdb_samplerate: 44100
   wav:  # path to custom wav dataset
   wav2:  # second custom wav dataset
@@ -89,7 +89,7 @@ ema:
 
 use_train_segment: true  # to remove
 model_segment:  # override the segment parameter for the model, usually 4 times the training segment.
-model: demucs  # see demucs/train.py for the possibilities, and config for each model hereafter.
+model: htdemucs  # see demucs/train.py for the possibilities, and config for each model hereafter.
 demucs:  # see demucs/demucs.py for a detailed description
   # Channels
   channels: 64

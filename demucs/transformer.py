@@ -461,8 +461,7 @@ class CrossTransformerEncoderLayer(nn.Module):
             mask = self.mask
             if mask.shape[-1] != S or mask.shape[-2] != T:
                 mask = get_mask(
-                    S,
-                    T,
+                    S, T,
                     self.mask_type,
                     self.sparse_attn_window,
                     self.global_window,
