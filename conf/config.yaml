@@ -8,7 +8,7 @@ defaults:
 
 dummy:
 dset:
-  musdb: ./data/musdbhq
+  musdb: ./data/musdb18hq/
   musdb_samplerate: 44100
   wav:  # path to custom wav dataset
   wav2:  # second custom wav dataset
@@ -36,7 +36,7 @@ test:
   nonhq:   # path to non hq MusDB for evaluation
 
 epochs: 360
-batch_size: 64
+batch_size: 4
 max_batches:  # limit the number of batches per epoch, useful for debugging
               # or if your dataset is gigantic.
 optim:

@@ -1,18 +1,22 @@
+import warnings
+
 import hydra
 import torch
 import torch.nn as nn
 from hydra.utils import to_absolute_path
 from pytorch_lightning import LightningDataModule, LightningModule, Trainer
+from pytorch_lightning.utilities.warnings import PossibleUserWarning
 from torch.utils.data import DataLoader
 
 import demucs.augment as augment
 from demucs import states
 from demucs.apply import apply_model
-from demucs.ema import ModelEMA
 from demucs.evaluate import new_sdr
 from demucs.svd import svd_penalty
 from demucs.train import get_datasets, get_model, get_optimizer
-from demucs.utils import EMA
+
+torch.set_float32_matmul_precision('medium')
+warnings.filterwarnings("ignore", category=PossibleUserWarning)
 
 
 class GetLoss(nn.Module):
@@ -68,15 +72,13 @@ class DemucsDataModule(LightningDataModule):
         self.args = args
         self.batch_size = args.batch_size
         self.num_worker = args.misc.num_workers
-
-    def setup(self) -> None:
         self.train_set, self.val_set = get_datasets(self.args)
 
     def train_dataloader(self):
-        return DataLoader(self.train_set, self.batch_size, shuffle=True, num_workers=self.num_worker)
+        return DataLoader(self.train_set, self.batch_size, shuffle=True, num_workers=self.num_worker, drop_last=True)
 
     def val_dataloader(self):
-        return DataLoader(self.val_set, self.batch_size, shuffle=False, num_workers=self.num_worker)
+        return DataLoader(self.val_set, self.batch_size, shuffle=False, num_workers=self.num_worker, drop_last=True)
 
 
 class DemucsModule(LightningModule):
@@ -88,14 +90,14 @@ class DemucsModule(LightningModule):
         self.model = get_model(args)
         self.batch_size = args.batch_size
         self.optimizer = get_optimizer(self.model, args)
-        self.averager = EMA()
-        self.emas = {'batch': [], 'epoch': []}
-        for kind in self.emas.keys():
-            decays = getattr(args.ema, kind)
-            device = self.device if kind == 'batch' else 'cpu'
-            if decays:
-                for decay in decays:
-                    self.emas[kind].append(ModelEMA(self.model, decay, device=device))
+        # self.averager = EMA()
+        # self.emas = {'batch': [], 'epoch': []}
+        # for kind in self.emas.keys():
+        #     decays = getattr(args.ema, kind)
+        #     device = self.device if kind == 'batch' else 'cpu'
+        #     if decays:
+        #         for decay in decays:
+        #             self.emas[kind].append(ModelEMA(self.model, decay, device=device))
         self.augument = get_augument(args)
         self.split = args.test.split
         self.quantizer = states.get_quantizer(self.model, args.quant, self.optimizer)
@@ -148,8 +150,11 @@ class DemucsModule(LightningModule):
     def test_step(self, batch, batch_idx):
         return self.validation_step(batch, batch_idx)
 
+    def configure_optimizers(self):
+        return self.optimizer
 
-@hydra.main(config_path="./conf", config_name="config.yaml")
+
+@hydra.main(version_base="1.1", config_path="./conf", config_name="config.yaml")
 def main(args):
     global __file__
     __file__ = to_absolute_path(__file__)
@@ -157,17 +162,17 @@ def main(args):
         val = getattr(args.dset, attr)
         if val is not None:
             setattr(args.dset, attr, to_absolute_path(val))
-    args = hydra.utils.instantiate(args)
+    hydra_args = hydra.utils.instantiate(args)
     # logger = WandbLogger('baseline', project="SourceSep")
-    dm = DemucsDataModule(args)
-    dm.setup()
-    model = DemucsModule(args)
+    dm = DemucsDataModule(hydra_args)
+    model = DemucsModule(hydra_args)
     trainer = Trainer(
         devices=-1,
+        accelerator='auto',
         max_epochs=args.epochs,
         precision=16,
     )
-    trainer.fit()
+    trainer.fit(model, datamodule=dm)
 
 
 if __name__ == '__main__':
