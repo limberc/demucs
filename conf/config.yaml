@@ -76,7 +76,7 @@ continue_best: true
 continue_opt: false
 
 misc:
-  num_workers: 10
+  num_workers: 40
   num_prints: 4
   show: false
   verbose: false

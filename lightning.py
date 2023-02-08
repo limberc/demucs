@@ -20,11 +20,10 @@ warnings.filterwarnings("ignore", category=PossibleUserWarning)
 
 
 class GetLoss(nn.Module):
-    def __init__(self, loss_n, weights, quantizer, diffq):
+    def __init__(self, loss_n, quantizer, diffq):
         super().__init__()
         self.loss_n = loss_n
         self.quantizer = quantizer
-        self.weights = torch.tensor(weights)
         self.diffq = diffq
         if loss_n == 'l1':
             self.loss = nn.L1Loss(reduction='none')
@@ -41,7 +40,6 @@ class GetLoss(nn.Module):
         elif self.loss_n == 'mse':
             loss = loss.mean(dims) ** 0.5
         loss = loss.mean(0)
-        loss = (loss * self.weights).sum() / self.weights.sum()
         ms = 0
         if self.quantizer is not None:
             ms = self.quantizer.model_size()
@@ -101,7 +99,9 @@ class DemucsModule(LightningModule):
         self.augument = get_augument(args)
         self.split = args.test.split
         self.quantizer = states.get_quantizer(self.model, args.quant, self.optimizer)
-        self.loss = GetLoss(args.optim.loss, args.weights, self.quantizer, args.quant.diffq)
+        # self.loss = GetLoss(args.optim.loss, args.weights, self.quantizer, args.quant.diffq)
+        # I have disabled the weights argument in GetLoss.
+        self.loss = GetLoss(args.optim.loss, self.quantizer, args.quant.diffq)
         self.svd = args.svd
 
     def training_step(self, batch, batch_idx):
@@ -111,25 +111,24 @@ class DemucsModule(LightningModule):
         if hasattr(self.model, 'transform_target'):
             sources = self.model.transform_target(mix, sources)
         assert estimate.shape == sources.shape, (estimate.shape, sources.shape)
-        loss_dir = self.loss(estimate, sources)
+        loss_dict = self.loss(estimate, sources)
         del estimate
         if self.svd.penalty > 0:
             kw = dict(self.svd)
             kw.pop('penalty')
             penalty_val = svd_penalty(self.model, **kw)
-            loss_dir['loss'] = loss_dir['reco'] + self.svd.penalty * penalty_val
+            loss_dict['loss'] = loss_dict['loss'] + self.svd.penalty * penalty_val
             self.log('train_penalty', penalty_val, logger=True, on_step=True, on_epoch=True)
         for k, source in enumerate(self.model.sources):
-            self.log(f'train_reco_{source}', loss_dir['reco'][k], logger=True, on_step=True, on_epoch=True)
-        self.log('train_loss', loss_dir['loss'], logger=True, on_step=True, on_epoch=True, batch_size=self.batch_size)
-        return loss_dir['loss']
+            self.log(f'train_reco_{source}', loss_dict['reco'][k], logger=True, on_step=True, on_epoch=True)
+        return loss_dict['loss']
 
     def validation_step(self, batch, batch_idx):
         mix = batch[:, 0]
         sources = batch[:, 1:]
         estimate = apply_model(self.model, mix, split=self.split, overlap=0)
         assert estimate.shape == sources.shape, (estimate.shape, sources.shape)
-        loss_dir = self.loss(estimate, sources)
+        loss_dict = self.loss(estimate, sources)
 
         nsdrs = new_sdr(sources, estimate.detach()).mean(0)
         del estimate
@@ -138,14 +137,13 @@ class DemucsModule(LightningModule):
         for source, nsdr, w in zip(self.model.sources, nsdrs, self.loss.weights):
             self.log(f'nsdr_{source}', nsdr, on_step=True, on_epoch=True)
             total += w * nsdr
-        loss_dir['nsdr'] = total / self.loss.weights.sum()
+        loss_dict['nsdr'] = total / self.loss.weights.sum()
 
         for k, source in enumerate(self.model.sources):
-            self.log(f'val_reco_{source}', loss_dir['reco'][k], logger=True, on_step=True, on_epoch=True)
+            self.log(f'val_reco_{source}', loss_dict['reco'][k], logger=True, on_step=True, on_epoch=True)
 
-        self.log('val_loss', loss_dir['loss'], logger=True, on_step=True, on_epoch=True, batch_size=self.batch_size)
-        self.log('val_nsdr', loss_dir['nsdr'], logger=True, on_step=True, on_epoch=True)
-        return loss_dir['loss']
+        self.log('val_nsdr', loss_dict['nsdr'], logger=True, on_step=True, on_epoch=True)
+        return loss_dict['loss']
 
     def test_step(self, batch, batch_idx):
         return self.validation_step(batch, batch_idx)
@@ -154,7 +152,7 @@ class DemucsModule(LightningModule):
         return self.optimizer
 
 
-@hydra.main(version_base="1.1", config_path="./conf", config_name="config.yaml")
+@hydra.main(version_base="1.3", config_path="./conf", config_name="config.yaml")
 def main(args):
     global __file__
     __file__ = to_absolute_path(__file__)
@@ -171,6 +169,7 @@ def main(args):
         accelerator='auto',
         max_epochs=args.epochs,
         precision=16,
+        strategy='ddp',
     )
     trainer.fit(model, datamodule=dm)
 
