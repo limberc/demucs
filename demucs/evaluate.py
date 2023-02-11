@@ -9,21 +9,18 @@ or the newest SDR definition from the MDX 2021 competition (this one will
 be reported as `nsdr` for `new sdr`).
 """
 
-from concurrent import futures
 import logging
+from concurrent import futures
 
-from dora.log import LogProgress
-import numpy as np
 import musdb
 import museval
+import numpy as np
 import torch as th
 
+from . import distrib
 from .apply import apply_model
 from .audio import convert_audio, save_audio
-from . import distrib
 from .utils import DummyPoolExecutor
-
-
 logger = logging.getLogger(__name__)
 
 
@@ -92,8 +89,8 @@ def evaluate(solver, compute_sdr=False):
     hop = int(1. * model.samplerate)
 
     indexes = range(distrib.rank, len(test_set), distrib.world_size)
-    indexes = LogProgress(logger, indexes, updates=args.misc.num_prints,
-                          name='Eval')
+    # indexes = LogProgress(logger, indexes, updates=args.misc.num_prints,
+    #                       name='Eval')
     pendings = []
 
     pool = futures.ProcessPoolExecutor if args.test.workers else DummyPoolExecutor
@@ -130,8 +127,8 @@ def evaluate(solver, compute_sdr=False):
             pendings.append((track.name, pool.submit(
                 eval_track, references, estimates, win=win, hop=hop, compute_sdr=compute_sdr)))
 
-        pendings = LogProgress(logger, pendings, updates=args.misc.num_prints,
-                               name='Eval (BSS)')
+        # pendings = LogProgress(logger, pendings, updates=args.misc.num_prints,
+        #                        name='Eval (BSS)')
         tracks = {}
         for track_name, pending in pendings:
             pending = pending.result()

@@ -9,9 +9,9 @@ import logging
 
 import torch
 import torch.nn.functional as F
-from dora import get_xp
-from dora.log import LogProgress, bold
-from dora.utils import write_and_rename
+# from dora import get_xp
+# from dora.log import LogProgress, bold
+# from dora.utils import write_and_rename
 
 from . import augment, distrib, pretrained, states
 from .apply import apply_model

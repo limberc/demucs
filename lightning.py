@@ -45,11 +45,7 @@ class GetLoss(nn.Module):
             ms = self.quantizer.model_size()
         if self.diffq:
             loss += self.diffq * ms
-        return {
-            'loss': loss,
-            'reco': loss,
-            'ms': ms
-        }
+        return loss, ms
 
 
 def get_augument(args):
@@ -107,43 +103,48 @@ class DemucsModule(LightningModule):
     def training_step(self, batch, batch_idx):
         sources = self.augument(batch)
         mix = sources.sum(dim=1)
-        estimate = self.model(mix)
+        estimate = self.model(mix)  # same shape as sources.
         if hasattr(self.model, 'transform_target'):
             sources = self.model.transform_target(mix, sources)
         assert estimate.shape == sources.shape, (estimate.shape, sources.shape)
-        loss_dict = self.loss(estimate, sources)
+        loss, ms = self.loss(estimate, sources)
+        loss = loss.sum()
         del estimate
         if self.svd.penalty > 0:
             kw = dict(self.svd)
             kw.pop('penalty')
             penalty_val = svd_penalty(self.model, **kw)
-            loss_dict['loss'] = loss_dict['loss'] + self.svd.penalty * penalty_val
+            loss += self.svd.penalty * penalty_val
             self.log('train_penalty', penalty_val, logger=True, on_step=True, on_epoch=True)
-        for k, source in enumerate(self.model.sources):
-            self.log(f'train_reco_{source}', loss_dict['reco'][k], logger=True, on_step=True, on_epoch=True)
-        return loss_dict['loss']
+        # for k, source in enumerate(self.model.sources):
+        #     loss_val = loss.data[k].item()
+        #     self.log(f'train_reco_{source}', loss_val, logger=True, on_step=True, on_epoch=True)
+        loss = loss.sum()
+        self.log('train_loss', loss, logger=True, on_step=True, on_epoch=True)
+        return loss
 
     def validation_step(self, batch, batch_idx):
         mix = batch[:, 0]
         sources = batch[:, 1:]
         estimate = apply_model(self.model, mix, split=self.split, overlap=0)
         assert estimate.shape == sources.shape, (estimate.shape, sources.shape)
-        loss_dict = self.loss(estimate, sources)
+        loss, ms = self.loss(estimate, sources)
 
         nsdrs = new_sdr(sources, estimate.detach()).mean(0)
         del estimate
 
         total = 0
-        for source, nsdr, w in zip(self.model.sources, nsdrs, self.loss.weights):
+        for source, nsdr in zip(self.model.sources, nsdrs):
             self.log(f'nsdr_{source}', nsdr, on_step=True, on_epoch=True)
-            total += w * nsdr
-        loss_dict['nsdr'] = total / self.loss.weights.sum()
+            total += nsdr
+        nsdr = total
 
-        for k, source in enumerate(self.model.sources):
-            self.log(f'val_reco_{source}', loss_dict['reco'][k], logger=True, on_step=True, on_epoch=True)
-
-        self.log('val_nsdr', loss_dict['nsdr'], logger=True, on_step=True, on_epoch=True)
-        return loss_dict['loss']
+        # for k, source in enumerate(self.model.sources):
+        #     loss_val = loss.data[k].item()
+        #     self.log(f'val_reco_{source}', loss_val, logger=True, on_step=True, on_epoch=True)
+        loss = loss.sum()
+        self.log('val_loss', loss, logger=True, on_step=True, on_epoch=True)
+        return loss
 
     def test_step(self, batch, batch_idx):
         return self.validation_step(batch, batch_idx)
@@ -168,6 +169,7 @@ def main(args):
         devices=-1,
         accelerator='auto',
         max_epochs=args.epochs,
+        benchmark=True,
         precision=16,
         strategy='ddp',
     )

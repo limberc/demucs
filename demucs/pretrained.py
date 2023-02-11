@@ -7,13 +7,13 @@
 """
 
 import logging
-from pathlib import Path
 import typing as tp
-
-from dora.log import fatal, bold
+from pathlib import Path
 
 from .hdemucs import HDemucs
-from .repo import RemoteRepo, LocalRepo, ModelOnlyRepo, BagOnlyRepo, AnyModelRepo, ModelLoadingError  # noqa
+from .repo import AnyModelRepo, BagOnlyRepo, LocalRepo, ModelLoadingError, ModelOnlyRepo, RemoteRepo  # noqa
+
+# from dora.log import fatal, bold
 
 logger = logging.getLogger(__name__)
 ROOT_URL = "https://dl.fbaipublicfiles.com/demucs/"

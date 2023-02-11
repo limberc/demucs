@@ -6,18 +6,18 @@
 """
 This code contains the spectrogram and Hybrid version of Demucs.
 """
-from copy import deepcopy
 import math
 import typing as tp
+from copy import deepcopy
 
-from openunmix.filtering import wiener
 import torch
+from openunmix.filtering import wiener
 from torch import nn
 from torch.nn import functional as F
 
 from .demucs import DConv, rescale_module
+from .spec import ispectro, spectro
 from .states import capture_init
-from .spec import spectro, ispectro
 
 
 def pad1d(x: torch.Tensor, paddings: tp.Tuple[int, int], mode: str = 'constant', value: float = 0.):
@@ -45,6 +45,7 @@ class ScaledEmbedding(nn.Module):
     Boost learning rate for embeddings (with `scale`).
     Also, can make embeddings continuous with `smooth`.
     """
+
     def __init__(self, num_embeddings: int, embedding_dim: int,
                  scale: float = 10., smooth=False):
         super().__init__()
@@ -166,6 +167,7 @@ class MultiWrap(nn.Module):
     This is a bit over-engineered to avoid edge artifacts when splitting
     the frequency bands, but it is possible the naive implementation would work as well...
     """
+
     def __init__(self, layer, split_ratios):
         """
         Args:
@@ -235,7 +237,7 @@ class MultiWrap(nn.Module):
                 out, _ = layer(y, s, None)
                 if outs:
                     outs[-1][:, :, -layer.stride:] += (
-                        out[:, :, :layer.stride] - layer.conv_tr.bias.view(1, -1, 1, 1))
+                            out[:, :, :layer.stride] - layer.conv_tr.bias.view(1, -1, 1, 1))
                     out = out[:, :, layer.stride:]
                 if ratio == 1:
                     out = out[:, :, :-layer.stride // 2, :]
@@ -362,6 +364,7 @@ class HDemucs(nn.Module):
 
     Unlike classic Demucs, there is no resampling here, and normalization is always applied.
     """
+
     @capture_init
     def __init__(self,
                  sources,
@@ -608,7 +611,7 @@ class HDemucs(nn.Module):
         z = spectro(x, nfft, hl)[..., :-1, :]
         if self.hybrid:
             assert z.shape[-1] == le + 4, (z.shape, x.shape, le)
-            z = z[..., 2:2+le]
+            z = z[..., 2:2 + le]
         return z
 
     def _ispec(self, z, length=None, scale=0):

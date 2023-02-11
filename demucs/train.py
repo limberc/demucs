@@ -13,7 +13,6 @@ from pathlib import Path
 
 import hydra
 import torch
-from dora import hydra_main
 from hydra.core.global_hydra import GlobalHydra
 from omegaconf import OmegaConf
 from torch import nn
@@ -211,28 +210,28 @@ def get_solver_from_sig(sig, model_only=False):
         return get_solver(xp.cfg, model_only)
 
 
-@hydra_main(config_path="../conf", config_name="config")
-def main(args):
-    global __file__
-    __file__ = hydra.utils.to_absolute_path(__file__)
-    for attr in ["musdb", "wav", "metadata"]:
-        val = getattr(args.dset, attr)
-        if val is not None:
-            setattr(args.dset, attr, hydra.utils.to_absolute_path(val))
-
-    os.environ["OMP_NUM_THREADS"] = "1"
-    os.environ["MKL_NUM_THREADS"] = "1"
-
-    if args.misc.verbose:
-        logger.setLevel(logging.DEBUG)
-
-    logger.info("For logs, checkpoints and samples check %s", os.getcwd())
-    logger.debug(args)
-    from dora import get_xp
-    logger.debug(get_xp().cfg)
-
-    solver = get_solver(args)
-    solver.train()
+# @hydra_main(config_path="../conf", config_name="config")
+# def main(args):
+#     global __file__
+#     __file__ = hydra.utils.to_absolute_path(__file__)
+#     for attr in ["musdb", "wav", "metadata"]:
+#         val = getattr(args.dset, attr)
+#         if val is not None:
+#             setattr(args.dset, attr, hydra.utils.to_absolute_path(val))
+#
+#     os.environ["OMP_NUM_THREADS"] = "1"
+#     os.environ["MKL_NUM_THREADS"] = "1"
+#
+#     if args.misc.verbose:
+#         logger.setLevel(logging.DEBUG)
+#
+#     logger.info("For logs, checkpoints and samples check %s", os.getcwd())
+#     logger.debug(args)
+#     from dora import get_xp
+#     logger.debug(get_xp().cfg)
+#
+#     solver = get_solver(args)
+#     solver.train()
 
 
 if '_DORA_TEST_PATH' in os.environ:

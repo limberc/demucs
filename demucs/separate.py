@@ -11,7 +11,7 @@ from pathlib import Path
 
 import torch as th
 import torchaudio as ta
-from dora.log import fatal
+# from dora.log import fatal
 
 from .apply import BagOfModels, apply_model
 from .audio import AudioFile, convert_audio, save_audio
